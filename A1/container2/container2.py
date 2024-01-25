@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 import os
+import csv
 
 app = Flask(__name__)
 port = 8000
@@ -12,22 +13,22 @@ def calculate():
         inputProduct = inputJSON.get('product')
         print(fileName, inputProduct)
         file_path = os.path.join('./data/', fileName)
-        print('file_path')
+        print(file_path)
         
-        with open(file_path, encoding='utf-8') as file:
-            content = file.read()
-            inputLines = content.split('\n')
-            sum = 0
-            for line in inputLines[1:]:  # Skip the header line
-                values = line.split(',')                   
-                product = values[0]
-                amount = int(values[1])
-                if product == inputProduct:
-                    sum += amount
-        
-        print('file', fileName, 'sum', sum)
-        return jsonify({"file": fileName, "sum": sum})
-    except Exception:
+        with open(file_path, 'r') as file:
+            reader = csv.reader(file)
+            header = next(reader)  
+            if header == ['product', 'amount']:
+                sum = 0
+                for line in reader:
+                    product, amount = line
+                    if product == inputProduct:
+                        sum = sum + int(amount)
+                print('file', fileName, 'sum', sum)
+                return jsonify({"file": fileName, "sum": sum})
+            else:
+                return jsonify({"file": fileName, "error": "Input file not in CSV format."})
+    except Exception as e:
         return jsonify({"file": fileName, "error": "Input file not in CSV format."})
         
 if __name__ == '__main__':

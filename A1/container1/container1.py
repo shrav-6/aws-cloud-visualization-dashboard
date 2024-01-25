@@ -18,6 +18,7 @@ def calculate():
             if not os.path.exists(file_path):
                 return jsonify({"file": file, "error": "File not found."})
             elif os.path.exists(file_path):
+                print('calling container2')
                 response = requests.post('http://container2:8000/calculate', json=inputJSON)
                 return jsonify(response.json())
         else:
