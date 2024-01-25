@@ -1,0 +1,22 @@
+services:
+  container1:
+    image: shrav6/container1
+    volumes:
+      - ./:/app/data
+    ports:
+      - 6000:6000
+    networks:
+      - assignment1-network
+
+  container2:
+    image: shrav6/container2
+    volumes:
+      - ./:/app/data
+    ports:
+      - 8000:8000
+    networks:
+      - assignment1-network
+
+networks:
+  assignment1-network:
+    driver: bridge
