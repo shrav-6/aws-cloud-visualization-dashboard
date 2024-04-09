@@ -1,0 +1,93 @@
+Parameters:
+  LabRole:
+    Type: String
+    Default: 'arn:aws:iam::187191599498:role/LabRole'
+    Description: IAM LabRole permissions.
+  S3BucketName:
+    Type: String
+    Default: 'shrav6-visualization-bucket'
+    Description: my s3 bucket for storing lambda function.
+Resources:
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Ref S3BucketName
+      Tags:
+        - Key: develop
+          Value: s3
+  MyLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !Ref LabRole
+      Runtime: python3.9
+      Timeout: 120
+      Code:
+        ZipFile: |
+          import http.client
+          import boto3
+          import zipfile
+          import io
+
+          def lambda_handler(event, context):
+              github_sns_lambda_function_url = 'https://raw.githubusercontent.com/shrav-6/sales_viz_repo/master/lambda_function.py'
+              github_dataset_url = "https://raw.githubusercontent.com/shrav-6/sales_viz_repo/master/dataset.csv"
+              s3_bucket_name = "shrav6-visualization-bucket"
+              s3_key = "lambda_function.zip"  # Update with the desired S3 key name
+
+              # For SNS Lambda Function
+              url_parts = http.client.urlsplit(github_sns_lambda_function_url)
+              host = url_parts.netloc
+              path = url_parts.path
+
+              conn = http.client.HTTPSConnection(host)
+              conn.request("GET", path)
+              response = conn.getresponse()
+
+              if response.status == 200:
+                  file_content = response.read()  # Read response content
+                  print("success")
+              else:
+                  print(f"Failed to download file: {response.status}")
+                  return
+
+              with io.BytesIO() as zip_buffer:
+                  with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                      zip_file.writestr("lambda_function.py", file_content)
+
+                  zip_content = zip_buffer.getvalue()
+                  
+              
+              # For dataset
+              url_parts = http.client.urlsplit(github_dataset_url)
+              host = url_parts.netloc
+              path = url_parts.path
+
+              # Establish connection to GitHub server using http.client
+              conn = http.client.HTTPSConnection(host)
+              conn.request("GET", path)
+              response = conn.getresponse()
+
+              if response.status == 200:
+                  file_content = response.read()  # Read response content
+                  print("success")
+              else:
+                  print(f"Failed to download file: {response.status}")
+                  return
+              
+              # Upload zip file content to S3 bucket using boto3
+              s3 = boto3.client('s3')
+              try:
+                  #s3_key = "dataset.csv"
+                  s3.put_object(Bucket=s3_bucket_name, Key="dataset.csv", Body=file_content)
+                  s3.put_object(Bucket=s3_bucket_name, Key="lambda_function.zip", Body=zip_content)
+                  print("File uploaded successfully to S3!")
+              except Exception as e:
+                  print(f"Error uploading file to S3: {e}")
+  Primerinvoke:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: MyLambdaFunction
+    Version: "1.0"
+    Properties:
+      ServiceToken: !GetAtt MyLambdaFunction.Arn

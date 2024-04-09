@@ -1,0 +1,35 @@
+.button-container {
+    display: flex;
+    padding: 10px;
+    margin-left:67%;
+}
+.dropdown {
+    margin-left: 5%;
+    width:100px;
+}
+h1 {
+    text-align: left;   
+}
+
+#btn-notify {
+    margin-left: 83%;
+    background-color: rgb(203, 183, 95);
+}
+
+.button {
+    background-color: #73d777;
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 30px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+.button:hover {
+    background-color: #338036;
+}

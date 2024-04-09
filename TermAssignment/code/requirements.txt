@@ -1,0 +1,6 @@
+Flask
+dash
+pandas
+boto3
+plotly
+colorlover

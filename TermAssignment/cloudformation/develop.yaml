@@ -1,0 +1,230 @@
+Parameters:
+  LabRole:
+    Type: String
+    Default: 'arn:aws:iam::187191599498:role/LabRole'
+    Description: IAM LabRole permissions.
+  S3BucketName:
+    Type: String
+    Default: 'shrav6-visualization-bucket'
+    Description: my s3 bucket for storing lambda function.
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: SSH key name for accessing the EC2 instance.
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues: [t2.micro]
+    ConstraintDescription: must be a valid EC2 instance type.
+  SSHLocation:
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  LatestAmiId:
+    Type:  AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+  myUserData:
+      Type: String
+      Default: |
+        #!/bin/bash
+        export AWS_ACCESS_KEY_ID=ASIASXFL5EGFBMA3RHX5
+        export AWS_SECRET_ACCESS_KEY=QzRU0/18NYdV7uusLhsrvzhXNGlFLUQc5h8MFnBO
+        export AWS_SESSION_TOKEN=IQoJb3JpZ2luX2VjENj//////////wEaCXVzLXdlc3QtMiJGMEQCIB7ujWz7/xO3X2QqbWeHV33mGLyJZcuVI6g96QX1HQV0AiBVSqb2orunCygMwHUXZfmZRW0WUbGDppP7coc+PQOqWSqxAggQEAEaDDE4NzE5MTU5OTQ5OCIMHz8dcukImvvierKfKo4CysA/+mE+w5wFY0AiO6ugPtXZ8/KQUS45mSGWD++2uE6lKgL8K0DqECS95ABmvGgEuBVu7j36Wc9u4qL27jo+jICoHxyrQGQsV8mbMyMEfTNphBQe1vkJXoVVCTAVY/05LHiLS7KLXexG9FFdk/5zWDCw/X/0ZF9lEL+aAVuqZbPLQn5IKdldGO0oMcZZQ/DDplAGhDcSz01PYwa02aCgDF8tSN70sCHHixrIPioLtEoTUPNBD0iOR/+JqdcYH7FcxEzIcpGYY2VBB4NY1NTbofjg/ckmq3mldbJx7AYHi2SqH7DjvgOn3Zu0znnM1n/bPhiL4sJ7D72j4njL6+f/h8Mnu3BCsqYYGcfX/O71MKfY07AGOp4BAxWomOBdAnrjkrG5R5z9biwuLX4uzAR0pvRJU9oxpr80EwT3pxoPzXE/scTMk1JHxG3hBdI+3ngi2gv+jxaj78vzB8Csid7hULiTEXMlmxLPMR8qNHwEAR6M6AwdervkQgTenu2Tzb2bvN7vGdZjsRGv1wdH+1szjK1d1eZxUCzq1ZLAmb3+G+CILkkrgpXive1UBnXhz6IVfq4NUwM=
+        export AWS_DEFAULT_REGION=us-east-1
+        export AWS_DEFAULT_OUTPUT=text
+        sudo yum install -y docker
+        sudo service docker start
+        export PASSWORD=`aws secretsmanager get-secret-value --secret-id MyAppSecret --query SecretString | jq -r | jq -r '.PASSWORD'`
+        export USERNAME=`aws secretsmanager get-secret-value --secret-id MyAppSecret --query SecretString | jq -r | jq -r '.USERNAME'`
+        sudo docker login -u $USERNAME -p $PASSWORD docker.io
+        sudo docker run -p 8000:8000 -t shrav6/sales-viz-app:latest
+Resources:
+  MyAppSecret:
+    Type: "AWS::SecretsManager::Secret"
+    Properties:
+      Name: MyAppSecret
+      Description: "Secret store for wallet watch application"
+      SecretString: '
+        {
+          "USERNAME": "shrav6",
+          "PASSWORD": "password123"
+        }
+      '
+      Tags:
+        - Key: AppName
+          Value: MyApp
+  SalesSNSReport:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: SalesReport
+  MySNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: el867903@dal.ca
+      TopicArn: !Ref SalesSNSReport
+  developvpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      InstanceTenancy: default
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+       - Key: develop
+         Value: developvpc
+       - Key: Name
+         Value: developvpc
+  developpublicsubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref developvpc
+      AvailabilityZone: "us-east-1a"
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: develop
+        Value: publicsubnet
+      - Key: Name
+        Value: publicsubnet
+  developprivatesubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref developvpc
+      AvailabilityZone: "us-east-1b"
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: develop
+        Value: privatesubnet
+      - Key: Name
+        Value: privatesubnet
+  VPCSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG to test ping
+      VpcId: !Ref developvpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: develop
+          Value: securitygroup
+  SNSVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: True
+      SecurityGroupIds:
+        - !Ref VPCSecGroup
+      ServiceName: "com.amazonaws.us-east-1.sns"
+      SubnetIds:
+        - !Ref developprivatesubnet
+      VpcEndpointType: Interface
+      VpcId: !Ref developvpc
+  VpcEndpointSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      VpcId: !Ref developvpc
+      GroupDescription: "Security group for VPC Endpoint"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref VPCSecGroup
+  RouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref developvpc
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+  VPCGatewayAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref developvpc
+      InternetGatewayId: !Ref "InternetGateway"
+  InternetRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+  SubnetARouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref developpublicsubnet
+  developec2:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref 'InstanceType'
+      KeyName: !Ref KeyName
+      ImageId: !Ref 'LatestAmiId'
+      SubnetId: !Ref developpublicsubnet
+      SecurityGroupIds:
+        - !Ref VPCSecGroup
+      Tags:
+        - Key: develop
+          Value: ec2
+        - Key: Name
+          Value: myec2server
+      UserData:
+        Fn::Base64: !Ref myUserData
+  emailReportLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: send-sns-lambda
+      Role: !Ref LabRole
+      Runtime: python3.9
+      Handler: lambda_function.lambda_handler
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: 'lambda_function.zip'
+      Timeout: 120
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref VPCSecGroup
+        SubnetIds:
+          - !Ref developprivatesubnet
+
+Outputs:
+  MyAppSecretArn:
+    Description: "ARN of the created secret"
+    Value: !Ref MyAppSecret
+    Export:
+      Name: !Sub "${AWS::StackName}-SecretArn"
+  MyAppSecretName:
+    Description: "Name of the created secret"
+    Value: MyAppSecret
+    Export:
+      Name: !Sub "${AWS::StackName}-SecretName"
+  InstanceId:
+    Description: InstanceId of the newly created EC2 instance
+    Value: !Ref 'developec2'
+  AZ:
+    Description: Availability Zone of the newly created EC2 instance
+    Value: !GetAtt [developec2, AvailabilityZone]
+  PublicDNS:
+    Description: Public DNSName of the newly created EC2 instance
+    Value: !GetAtt [developec2, PublicDnsName]
+  PublicIP:
+    Description: Public IP address of the newly created EC2 instance
+    Value: !GetAtt [developec2, PublicIp]
